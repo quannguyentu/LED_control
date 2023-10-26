@@ -1,10 +1,10 @@
 #include <FastLED.h> 
 
-#define NUM_LEDS 36
+#define NUM_LEDS 10
 #define DATA_PIN 11
 #define CLOCK_PIN 13
 
-int blend_rate = 1000;
+int blend_rate = 100;
 
 CRGB leds[NUM_LEDS];
 const uint8_t color_array[30][3] = {
@@ -37,8 +37,16 @@ const uint8_t color_array[30][3] = {
   {255,	103,0},
   {255,	99, 71},
   {250,	42, 85},
-  {252,	108,133},
+  {252,	108,133}
 } ;
+// const uint8_t color_array[6][3] = {
+//   {0,	0,255},
+//   {0, 255,0},
+//   {255, 0,0},
+//   {0,	0,255},
+//   {0, 255,0},
+//   {255, 0,0}
+// } ;
 
 const int number_of_colors = sizeof(color_array)/sizeof(uint8_t)/3;
 CRGB color_sequence[number_of_colors];
@@ -48,11 +56,9 @@ CRGB current_color;
 int current_color_index = 0;
 
 // Helper function that blends one uint8_t toward another by a given amount
-void nblendU8TowardU8( uint8_t& cur, const uint8_t target, int N){
+void nblendU8TowardU8( uint8_t& cur, const uint8_t target, uint8_t amount){
   if( cur == target) return;
 
-  int timeToReachTarget = 10000;  // 10 seconds in milliseconds
-  int amount = 255 * N / timeToReachTarget;
   
   if( cur < target ) {
     uint8_t delta = target - cur;
@@ -101,17 +107,23 @@ void setup() {
     // delay(10000);
 }
 
-unsigned long start = millis();
+const int targetTime = 10000;
+unsigned long startTime = millis();
 void loop(){
+
+
     EVERY_N_MILLISECONDS(blend_rate){
+      unsigned long currentTime = millis();
+      unsigned long elapsedTime = currentTime - startTime;
       if (current_color == target_color){
-        unsigned long end = millis();
-        unsigned long delta = end - start;
-        Serial.println(delta/1000.0);
+        Serial.print("Elapsed time: ");
+        Serial.print(elapsedTime/1000.0);
         start_color = current_color;
         target_color = color_sequence[current_color_index];
         current_color_index += 1;
-        start = millis();
+        Serial.print(" Start color: ");
+        Serial.print(start_color.r); Serial.print(" "); Serial.print(start_color.g); Serial.print(" "); Serial.print(start_color.b); Serial.print("\n");
+        startTime = currentTime;
 
 
         if (current_color_index == number_of_colors) {
@@ -120,11 +132,13 @@ void loop(){
 
         // delay(10000);
       }
-      current_color = fadeTowardColor(current_color, target_color, blend_rate);
+      uint8_t amount = map(constrain(elapsedTime, 0, targetTime), 0, targetTime, 0, 255);
+      current_color = fadeTowardColor(current_color, target_color, 10);
       fill_solid(leds, NUM_LEDS, current_color);
-      leds[0] = color_sequence[current_color_index];
+      leds[0] = color_sequence[current_color_index+1];
     }
 
     // Serial.print(current_color.r); Serial.print(" "); Serial.print(current_color.g); Serial.print(" "); Serial.print(current_color.b); Serial.print("\n");
     FastLED.show();
 }
+
