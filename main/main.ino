@@ -4,7 +4,7 @@
 #define DATA_PIN 11
 #define CLOCK_PIN 13
 
-int blend_rate = 100;
+int blend_rate = 10;
 
 CRGB leds[NUM_LEDS];
 const uint8_t color_array[30][3] = {
@@ -87,6 +87,51 @@ CRGB fadeTowardColor( CRGB& cur, const CRGB& target, uint8_t amount){
   return cur;
 }
 
+int calculateStep(int prevValue, int endValue) {
+  int step = endValue - prevValue; // What's the overall gap?
+  if (step) {                      // If its non-zero, 
+    step = 1020/step;              //   divide by 1020
+  } 
+  return step;
+}
+
+int calculateVal(int step, int val, int i) {
+
+  if ((step) && i % step == 0) { // If step is non-zero and its time to change a     value,
+    if (step > 0) {              //   increment the value if step is positive...
+      val += 1;           
+    } 
+    else if (step < 0) {         //   ...or decrement it if step is negative
+      val -= 1;
+    } 
+  }
+  // Defensive driving: make sure val stays in the range 0-255
+  if (val > 255) {
+    val = 255;
+  } 
+  else if (val < 0) {
+    val = 0;
+  }
+  return val;
+}
+
+
+CRGB crossFade( CRGB& cur, const CRGB& target, int i) {
+  // Convert to 0-255
+  int R = (target.r * 255) / 100;
+  int G = (target.g * 255) / 100;
+  int B = (target.b * 255) / 100;
+
+  int stepR = calculateStep(cur.r, target.r);
+  int stepG = calculateStep(cur.g, target.g);
+  int stepB = calculateStep(cur.b, target.b);
+
+  cur.r = calculateVal(stepR, cur.r, i);
+  cur.g = calculateVal(stepG, cur.g, i);
+  cur.b = calculateVal(stepB, cur.b, i);
+  return cur;
+}
+
 void setup() {
     Serial.begin(115200);
     LEDS.addLeds<APA102,DATA_PIN, CLOCK_PIN,BGR>(leds,NUM_LEDS);
@@ -115,30 +160,32 @@ void loop(){
     EVERY_N_MILLISECONDS(blend_rate){
       unsigned long currentTime = millis();
       unsigned long elapsedTime = currentTime - startTime;
+      static int k;
       if (current_color == target_color){
-        Serial.print("Elapsed time: ");
+        Serial.print("Fading time: ");
         Serial.print(elapsedTime/1000.0);
         start_color = current_color;
         target_color = color_sequence[current_color_index];
         current_color_index += 1;
-        Serial.print(" Start color: ");
+        Serial.print(" Current color: ");
         Serial.print(start_color.r); Serial.print(" "); Serial.print(start_color.g); Serial.print(" "); Serial.print(start_color.b); Serial.print("\n");
-        startTime = currentTime;
-
 
         if (current_color_index == number_of_colors) {
           current_color_index = 0;
         }
-
-        // delay(10000);
+        k = 0;  // reset k value
+        FastLED.delay(1000);
+        currentTime = millis();
+        startTime = currentTime;
       }
-      uint8_t amount = map(constrain(elapsedTime, 0, targetTime), 0, targetTime, 0, 255);
-      current_color = fadeTowardColor(current_color, target_color, 10);
+      
+      current_color = crossFade(current_color, target_color, k);
       fill_solid(leds, NUM_LEDS, current_color);
-      leds[0] = color_sequence[current_color_index+1];
+      k++;
+      leds[0] = target_color;
     }
+    FastLED.show();
 
     // Serial.print(current_color.r); Serial.print(" "); Serial.print(current_color.g); Serial.print(" "); Serial.print(current_color.b); Serial.print("\n");
-    FastLED.show();
 }
 
